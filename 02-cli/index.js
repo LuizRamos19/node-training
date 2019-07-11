@@ -15,7 +15,8 @@
                   do arquivo
 */
 // Importamos o herói
-const Hero = require('./src/heroEntity')
+const Hero = require('./src/heroEntity');
+const HeroDbFile = require('./src/heroDbFile');
 // Importamos o Commander
 const Commander = require('commander')
 const commander = Commander
@@ -31,29 +32,63 @@ const commander = Commander
                     .option('-l, --listar', 'deve listar um Herói')
                     .parse(process.argv);
 
-(function main() {
+async function main() {
+    const dbFile = new HeroDbFile();
+
     const hero = new Hero(commander);
     // node index.js --cadastrar ou node index.js -c
     /*
-        node index.js \
-            --name Flash \
-            --power Velocidade \
-            --age 80 \
-            --cadastrar
-        node index.js --name Flash --power Velocidade --age 80 --cadastrar
+        Para rodar o cli basta executar um desses dois códigos:
+            node index.js \
+                --name Flash \
+                --power Velocidade \
+                --age 80 \
+                --cadastrar
+            node index.js --name Flash --power Velocidade --age 80 --cadastrar
     */
-    switch(commander) {
-        case 'cadastrar':
-            console.log('chamou cadastrar!', hero);
-            return;
-        case 'atualizar':
-            console.log('chamou atualizar!', hero);
-            return;
-        case 'listar':
-            console.log('chamou listar!', hero);
-            return;
-        case 'remover':
-            console.log('chamou remover!', hero);
-            return;
+    if (commander.cadastrar) {
+        await dbFile.register(hero);
+        console.log('Hero success registered');
+        return;
     }
-})()
+    /*
+        node index.js --nome fl --listar
+    */
+    if (commander.listar) {
+        // no js atualmente usamos dois tipos de variáveis.
+        // -> const -> valores que nunca se alteram
+        // -> let -> valores que podem ser alterados
+        let filter = {};
+        if (hero.name) {
+            filter = { name: hero.name }
+        }
+        const heros = await dbFile.list(filter);
+        console.log('chamou listar!', JSON.stringify(heros));
+        return;
+    }
+    /*
+        node index.js --name Flash --power Força --id 328438434 --atualizar
+    */
+    if (commander.atualizar) {
+        const { id } = hero;
+        // para não atualizar o ID, vamos remover
+        delete hero.id;
+        await dbFile.update(id, hero);
+        console.log('Herói atualizado com sucesso!');
+        return;
+    }
+    /*
+        node index.js --id 1562881461433 --remover
+    */
+    if (commander.remover) {
+        const id = hero.id;
+        if (!id) {
+            throw new Error('Você deve passar um ID');
+        }
+        await dbFile.remove(id);
+        console.log('Herói removido com sucesso');
+        return;
+    }
+};
+
+main();

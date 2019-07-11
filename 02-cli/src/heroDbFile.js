@@ -58,8 +58,43 @@ class HeroDbFile {
         const dataFiltered = data.filter(hero => {
             return ~hero.name.toLowerCase().indexOf(filter.name.toLowerCase());    //o tio serve para que se o resultado for -1, ele considera como false
         });
-        console.log("Teste ", dataFiltered)
         return dataFiltered;
+    }
+
+    async remove(idHero) {
+        const data = await this._getFile();
+        const dataFiltered = data.filter(( { id } ) => id !== parseInt(idHero));
+        return await this._writeFile(dataFiltered);
+    }
+
+    async update(idHero, heroUpdated) {
+        const data = await this._getFile();
+        const indexOldHero = data.findIndex(( { id } ) => id === parseInt(idHero));
+
+        if (indexOldHero === -1) {
+            throw new Error('O herói não existe');
+        }
+        const atual = data[indexOldHero];
+        // removemos o item da lista
+        // o segundo parâmetro e falar quantos vai remover
+        data.splice(indexOldHero, 1);
+        // para remover todas as chaves que estejam vazias (undefined) precisamos converter o objeto 
+        // para String e depois para objeto novamente
+        const objText = JSON.stringify(heroUpdated);
+        const objFinal = JSON.parse(objText);
+
+        const heroChanged = {
+            ...atual,
+            ...objFinal
+        }
+
+        const newList = [
+            ...data,
+            heroChanged
+        ]
+
+        await this._writeFile(newList);
+        return;
     }
 }
 
@@ -68,13 +103,15 @@ module.exports = HeroDbFile;
 
 // testamos a classe
 // LEMBRAR DE COMENTAR DEPOIS
-(async function main() {
-    const myClass = new HeroDbFile();
-    // await myClass.register({
-    //     name: "Batman",
-    //     power: "Money"
-    // })
-    // const data = await myClass._getFile();
-    const data = await myClass.list({name: "Flash"});
-    console.log('data ', data);
-})();
+// async function main() {
+//     const myClass = new HeroDbFile();
+//     // await myClass.register({
+//     //     name: "Batman",
+//     //     power: "Money"
+//     // })
+//     // const data = await myClass._getFile();
+//     const data = await myClass.list({name: "Flash"});
+//     console.log('data ', data);
+// };
+
+// main();
