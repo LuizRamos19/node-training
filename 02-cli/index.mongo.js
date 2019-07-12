@@ -86,6 +86,9 @@ async function main() {
         if (commander.atualizar) {
             const { _id } = hero;
             // para não atualizar com o _id
+            if (!_id) {
+                throw new Error('o id é obrigatório');
+            }
             delete hero._id;
             // gambiarra do bem, para remover as chaves undefined
             const heroFinal = JSON.parse(JSON.stringify(hero));
