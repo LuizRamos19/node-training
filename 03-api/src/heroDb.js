@@ -46,10 +46,10 @@ class HeroDB {
     async connect() {
         // para conectar com o mongodb local
         // localhost:27017/[dbName]
-        const mongodbString = 'mongodb://localhost:27017/hero';
+        const mongodbString = process.env.MONGO_URI;
         const mongoClient = new MongoClient(mongodbString, { useNewUrlParser: true });
         const connection = await mongoClient.connect();
-        const heroCollection = await connection.db('caracteres').collection('hero');
+        const heroCollection = await connection.db(process.env.MONGO_DATABASE).collection(process.env.MONGO_COLLECTION);
         // adicionamos o herói para a instância da classe
         this.heroCollection = heroCollection;
     }

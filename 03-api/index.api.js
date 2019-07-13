@@ -49,7 +49,133 @@
 
     // para padronizar status de operação das APIs usamos o Boom
     npm install boom
+
+    // Um padrão conhecido na web para autenticar APIs Restfull, é conhecido como JWT -> JSON Web Token
+
+    -> Autenticação
+        -> Login
+    -> Autorização
+        -> Permissão de acesso
+    
+    // Vamos usar o melhor computador do mundo (o do cliente), uma vez logado, fornecemos um TOKEN que 
+    // informa que o user usa a cada chamada.
+    // Não usamos sessão ou cookies pois honera o servidor, é difícil de escalar e gasta mais memória.
+
+    // Precisamos de duas rotas
+    // Pública -> Login
+    // Privadas -> Todas as nossas APIs
+
+    // vamos instalar um pacote para manipular TOKEN
+        -> Sign, Verify, jwt.io
+    npm install jsonwebtoken
+
+    // Para validar todos os requests baseado numa estratégia padrão de autenticação, precisamos instalar o hapi jwt.
+    // Requests validam token primeiro e só depois chamam o handler.
+
+    npm install hapi-auth-jwt2
+    -> 1o Registrar o Plugin
+    -> 2o Criar a estratégia JWT (que vai refletir em todas as rotas)
+    -> 3o passo, colocar auth: false nas rotas públicas
+
+    // Para gerenciar ambientes
+    -> Produção
+    -> Desenvolvimento
+    -> Homologação
+
+    // Vamos dividir nossos ambientes
+    config
+        -> .env.development
+        -> .env.production
+
+    npm install dotenv
+    // IMPORTANTE: Só chamamos a configuração no arquivo inicial.
+
+    // para usar variáveis de ambiente multiplataforma, instalamos o cross-env
+    npm install cross-env
+
+    // Primeiro criamos o banco de dados na mongodb.com
+    // -> criamos o user (Security -> Database Access -> Add User)
+    // -> liberamos o ip (Security Network Access -> Add IP Address -> Allow any ip)
+
+    // Pegamos a conexão -> Clusters -> Connect -> Connect Application e copiamos a string <user>:<password>...
+    // voltamos a maquina local e testamos a conexão mongo stringMongoDB
+    show dbs
+
+    copiamos e colamos .env.dev... e criamos o .prod
+    // -> substituimos a KEY do JWT por uma escolhida por nós
+    // -> Adicionamos a nova string do Mongo
+        // -> removemos tudo que tinha de /teste para frente
+        // -> substituimos o /teste pela nossa db /caracteres
+
+    // -> adicionamos no package.json o script para prod
+
+    npm install -g heroku
+    heroku login
+
+    heroku apps -> para listar as aplicações
+
+    // para subir a aplicação e gerar a URL automática no heroku
+    1o git init
+    1.1o criar o arquivo Procfile
+        -> Arquivo do heroku ensinando como rodar nossa APP
+    2o npx gitignore node -> vai criar um arquivo para ignorar arquivos comuns do node (build, node_modules, bin)
+    TODA ALTERAÇÃO QUE FOR PARA PROD, RODAR OS PASSOS ABAIXO (3, 4, 6)
+    3o git add .
+    4o git commit -m "Versão 1"
+    5o heroku apps:create meuNome-heroes
+    // -> após esse processo o heroku vai adicionar a origin em nosso repo local
+    6o git push heroku master
+
+    heroku logs -a nomeDoApp -t     // -> -t Tail, reflete qualquer alteração no terminal
+
+    // Se der problema ele QUEBRA e NÃO VOLTA
+    // Não sabemos quanto de CPU/MEMORIA/DISCO a aplicação está usando e fica difícil saber se precisa escalar 
+
+    npm install pm2
+    // pm2 keymetrics
+
+    pm2 list -> lista as aplicações
+    pm2 start -> nomeArquivo.js -i 10 // -i -> quantidade de instâncias
+    pm2 stop
+    pm2 monit
+    pm2 logs 1
+
+    // ENV PM2_PUBLIC_KEY vcczxrzwpwpv74f
+    // ENV PM2_SECRET_KEY tnsynqmpkb87n6k
+
+    heroku config:set PM2_PUBLIC_KEY=vcczxrzwpwpv74f PM2_SECRET_KEY=tnsynqmpkb87n6k
+
+    // Podemos usar também um pacote NPM para fazer teste de carga
+
+    npm install -g autocannon
+
+    --header 'Accept: application/json' --header 'authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImNoYXBvbGluIiwiaWF0IjoxNTYzMDQwODc5LCJleHAiOjE1NjMwNDA5Mzl9.JfTpAkEUypF2gAB2sn2eoldTgIl6qQkWGFGc3gFC4sY' 'https://myapi-heroes.herokuapp.com/v1/heroes?skip=0&limit=10'
+    
+    autocannon 'https://myapi-heroes.herokuapp.com/v1/heroes?skip=0&limit=10'
+                --header 'Accept: application/json'
+                --header 'authorization: MyToken'
+                --header 'Content-Type: application/json' -c 5 -d 2 -r 2
+
+    autocannon 'https://myapi-heroes.herokuapp.com/v1/heroes?skip=0&limit=10'
+    --header 'Accept: application/json' --header 'authorization: MyToken'
+    --header 'Content-Type: application/json'
+    --duration 10
+    --concurrent 300
+
+    // Por padrão aplicações vem fechadas e você define quem pode acessar a sua API. Se alguém tentar acessar vai cair no erro 
+    // (Cross Origin Resource Source (CORS))
+
 */
+
+// fazemos a configuração de ambiente antes de todos os pacotes, pois se algum deles precisar usar algumas
+// dessas variáveis não será afetado
+const { config } = require('dotenv');
+const env = process.env.NODE_ENV;
+config({
+    path: `./config/.env.${env}`
+})
+
+console.log('PROCESS', process.env)
 
 const Hapi = require('hapi');
 // importamos o Joi para validar as requisições
@@ -62,12 +188,36 @@ const Inert = require('inert');
 // boom para status HTTP
 const Boom = require('boom');
 
+// jwt para manipular TOKEN
+const Jwt = require('jsonwebtoken');
+// hapi jwt para validar em todos os request
+const HapiJwt = require('hapi-auth-jwt2');
+
 const { ObjectID } = require('mongodb');
 
 const Db = require('./src/heroDb');
 const app = new Hapi.Server({
-    port: 3000
+    port: process.env.PORT,
+    // devemos informar quem pode acessar a nossa API
+    routes: {
+        // outra opção
+        // cors: true   -> libera pra todo mundo também
+        cors: {
+            // podemos informar a lista de clientes que podem acessar.
+            // Para liberar a todos, deixamos o *
+            origin: ['*'],
+        }
+    }
 });
+
+const MY_SECRET_KEY = process.env.JWT_KEY;
+const USER = {
+    username: process.env.USER_API,
+    password: process.env.PASSWORD_API
+}
+const defaultHeader = Joi.object({
+    authorization: Joi.string().required()
+}).unknown();
 
 async function main() {
     try {
@@ -75,6 +225,9 @@ async function main() {
         await database.connect();
         console.log('database connected');
         await app.register([
+            // Auth
+            HapiJwt,
+            // Swagger
             Inert,
             Vision,
             {
@@ -85,10 +238,22 @@ async function main() {
                         title: 'API Heroes - Luiz',
                         version: 'v1.0'
                     },
-                    lang: 'pt'
+                    lang: process.env.LANG_API
                 }
             }
-        ])
+        ]);
+        // Criamos uma estratégia de autenticação padrão para refletir em todas as rotas
+        app.auth.strategy('jwt', 'jwt', {
+            key: MY_SECRET_KEY,
+            validate: (data, request) => {
+                // poderíamos validar o user no banco, verificar se ele está com a conta em dia ou mesmo se continua ativo na base
+                return {
+                    isValid: true
+                }
+            }
+        });
+        // defini que será a padrão
+        app.auth.default('jwt');
         // vamos definir as rotas
         app.route([
             {
@@ -110,7 +275,8 @@ async function main() {
                             name: Joi.string().max(10).min(2),
                             skip: Joi.number().default(0),
                             limit: Joi.number().max(10).default(10)
-                        }
+                        },
+                        headers: defaultHeader
                     }
                 },
                 handler: async (request) => {
@@ -142,13 +308,14 @@ async function main() {
                             name: Joi.string().max(10).required(),
                             age: Joi.number().min(18).required(),
                             power: Joi.string().max(10).required()
-                        }
+                        },
+                        headers: defaultHeader
                     }
                 },
                 handler: async (request, h) => {
                     try {
                         const { payload } = request;
-                        const v = database.register(payload);
+                        const v = await database.register(payload);
                         // código rest correto para created
                         return h.response(v).code(201);
                     } catch (error) {
@@ -170,7 +337,8 @@ async function main() {
                         },
                         params: {
                             id: Joi.string().max(40).required(),
-                        }
+                        },
+                        headers: defaultHeader
                     }
                 },
                 async handler(request) {
@@ -201,7 +369,8 @@ async function main() {
                             name: Joi.string().max(10).min(2),
                             power: Joi.string().max(10).min(2),
                             age: Joi.number().min(18)
-                        }
+                        },
+                        headers: defaultHeader
                     }
                 },
                 async handler(request) {
@@ -217,6 +386,41 @@ async function main() {
                         return database.update(ObjectID(id), payload);
                     } catch (error) {
                         console.error('DEU RUIM NO UPDATE PATCH HEROES', error);
+                        return Boom.internal();
+                    }
+                }
+            },
+            {
+                path: '/v1/login',
+                method: 'POST',
+                config: {
+                    // desabilitamos a autenticação no login, pois será a única rota públic
+                    auth: false,
+                    tags: ['api'],
+                    description: 'Fazer login',
+                    notes: 'Login com user e senha',
+                    validate: {
+                        failAction: (request, header, error) => {
+                            throw error;
+                        },
+                        payload: {
+                            username: Joi.string().max(10).required(),
+                            password: Joi.string().min(3).max(100).required()
+                        }
+                    }
+                },
+                async handler({ payload: {username, password} }) {
+                    try {
+                        if (username !== USER.username || password !== USER.password) {
+                            return Boom.unauthorized();
+                        }
+                        const tokenPayload = { username };
+                        const token = Jwt.sign(tokenPayload, MY_SECRET_KEY, {
+                            expiresIn: '60s'
+                        });
+                        return token;
+                    } catch (error) {
+                        console.error('DEU RUIM NO LOGIN', error);
                         return Boom.internal();
                     }
                 }
