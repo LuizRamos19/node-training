@@ -75,8 +75,8 @@ async function main() {
                     }
                 }
             }
-            const heros = await dbMongo.list(filter);
-            console.log('chamou listar!', JSON.stringify(heros));
+            const heroes = await dbMongo.list(filter);
+            console.log('chamou listar!', JSON.stringify(heroes));
             process.exit(0);
             return;
         }
@@ -90,7 +90,7 @@ async function main() {
                 throw new Error('o id é obrigatório');
             }
             delete hero._id;
-            // gambiarra do bem, para remover as chaves undefined
+            // gambiarra do bem, para remover as chaves undefined, para que não salve os valores como undefined para os que não foram passados pelo commander
             const heroFinal = JSON.parse(JSON.stringify(hero));
             await dbMongo.update(_id, heroFinal);
             console.log('Herói atualizado com sucesso!');

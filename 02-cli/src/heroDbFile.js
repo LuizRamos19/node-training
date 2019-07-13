@@ -14,7 +14,7 @@ const existsAsync = (param) => new Promise((resolve, reject) => {exists(param, (
 
 class HeroDbFile {
     constructor() {
-        this.FILE_NAME = 'heros.json';
+        this.FILE_NAME = 'heroes.json';
     }
 
     async _getFile() {
@@ -37,11 +37,11 @@ class HeroDbFile {
 
     async register(hero) {
         // obtemos os heróis
-        const heros = await this.list();
+        const heroes = await this.list();
         // criar id baseado na hora
         hero.id = Date.now();
-        heros.push(hero);
-        await this._writeFile(heros);
+        heroes.push(hero);
+        await this._writeFile(heroes);
         return;
     }
     // vamos definir que o filtro é opcional

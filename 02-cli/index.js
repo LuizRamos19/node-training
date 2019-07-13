@@ -62,8 +62,8 @@ async function main() {
         if (hero.name) {
             filter = { name: hero.name }
         }
-        const heros = await dbFile.list(filter);
-        console.log('chamou listar!', JSON.stringify(heros));
+        const heroes = await dbFile.list(filter);
+        console.log('chamou listar!', JSON.stringify(heroes));
         return;
     }
     /*
